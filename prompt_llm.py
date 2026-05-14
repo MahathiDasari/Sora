@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import subprocess
 
 import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -33,6 +34,31 @@ class PromptPlan:
         }
 
 
+def _resolve_ad_token(token: Optional[str]) -> Optional[str]:
+    if token:
+        return token
+    try:
+        out = subprocess.check_output(
+            [
+                "az",
+                "account",
+                "get-access-token",
+                "--resource",
+                "https://cognitiveservices.azure.com",
+                "--query",
+                "accessToken",
+                "-o",
+                "tsv",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=8,
+        ).strip()
+        return out or None
+    except Exception:
+        return None
+
+
 class PromptLLMClient:
     """Generates a structured storyboard/prompt plan from a topic + time.
 
@@ -43,38 +69,26 @@ class PromptLLMClient:
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
+        ad_token: Optional[str] = None,
         deployment: Optional[str] = None,
         api_version: Optional[str] = None,
         mock: bool = False,
     ) -> None:
+        self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
         import os
-
-        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
-        self.deployment = deployment or os.getenv("AZURE_OPENAI_TEXT_MODEL")
-        self.api_version = api_version or os.getenv("AZURE_OPENAI_TEXT_API_VERSION", "2024-10-01-preview")
+        self.api_key = api_key
+        self.ad_token = _resolve_ad_token(ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN"))
+        self.deployment = deployment or "sora-2"
+        self.api_version = api_version or "2024-10-01-preview"
         self.mock = mock
 
-        # Allow longer timeouts for large prompts / slower regions.
-        try:
-            self.timeout_s = float(os.getenv("AZURE_OPENAI_TEXT_TIMEOUT", "180"))
-        except Exception:
-            self.timeout_s = 180.0
+        self.timeout_s = 180.0
+        self.max_retries = 2
+        self.retry_backoff_s = 2.0
 
-        try:
-            self.max_retries = int(os.getenv("AZURE_OPENAI_TEXT_RETRIES", "2"))
-        except Exception:
-            self.max_retries = 2
-
-        try:
-            self.retry_backoff_s = float(os.getenv("AZURE_OPENAI_TEXT_RETRY_BACKOFF", "2"))
-        except Exception:
-            self.retry_backoff_s = 2.0
-
-        if not self.mock and not all([self.endpoint, self.api_key, self.deployment]):
-            raise ValueError(
-                "AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_TEXT_MODEL must be set for --auto (or use --mock-llm)."
-            )
+        if (not self.mock and not all([self.endpoint, self.deployment])) or (not self.mock and not (self.api_key or self.ad_token)):
+            # Graceful fallback: still allow local storyboard generation without cloud credentials.
+            self.mock = True
 
         self.session = requests.Session()
 
@@ -104,10 +118,12 @@ class PromptLLMClient:
         return f"{base}/openai/deployments/{self.deployment}/chat/completions?api-version={self.api_version}"
 
     def _headers(self) -> Dict[str, str]:
-        return {
-            "Content-Type": "application/json",
-            "api-key": self.api_key or "",
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["api-key"] = self.api_key
+        elif self.ad_token:
+            headers["Authorization"] = f"Bearer {self.ad_token}"
+        return headers
 
     def generate_plan(
         self,
