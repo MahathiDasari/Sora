@@ -86,10 +86,9 @@ class PromptLLMClient:
         self.max_retries = 2
         self.retry_backoff_s = 2.0
 
-        if not self.mock and not all([self.endpoint, self.deployment]) or (not self.mock and not (self.api_key or self.ad_token)):
-            raise ValueError(
-                "Missing text configuration. Provide endpoint/deployment and either api_key, ad_token, or run az login."
-            )
+        if (not self.mock and not all([self.endpoint, self.deployment])) or (not self.mock and not (self.api_key or self.ad_token)):
+            # Graceful fallback: still allow local storyboard generation without cloud credentials.
+            self.mock = True
 
         self.session = requests.Session()
 
