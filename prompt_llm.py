@@ -47,33 +47,20 @@ class PromptLLMClient:
         api_version: Optional[str] = None,
         mock: bool = False,
     ) -> None:
-        import os
-
-        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
-        self.deployment = deployment or os.getenv("AZURE_OPENAI_TEXT_MODEL")
-        self.api_version = api_version or os.getenv("AZURE_OPENAI_TEXT_API_VERSION", "2024-10-01-preview")
+        self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
+        self.api_key = api_key
+        self.ad_token = None
+        self.deployment = deployment or "sora-2"
+        self.api_version = api_version or "2024-10-01-preview"
         self.mock = mock
 
-        # Allow longer timeouts for large prompts / slower regions.
-        try:
-            self.timeout_s = float(os.getenv("AZURE_OPENAI_TEXT_TIMEOUT", "180"))
-        except Exception:
-            self.timeout_s = 180.0
+        self.timeout_s = 180.0
+        self.max_retries = 2
+        self.retry_backoff_s = 2.0
 
-        try:
-            self.max_retries = int(os.getenv("AZURE_OPENAI_TEXT_RETRIES", "2"))
-        except Exception:
-            self.max_retries = 2
-
-        try:
-            self.retry_backoff_s = float(os.getenv("AZURE_OPENAI_TEXT_RETRY_BACKOFF", "2"))
-        except Exception:
-            self.retry_backoff_s = 2.0
-
-        if not self.mock and not all([self.endpoint, self.api_key, self.deployment]):
+        if not self.mock and not all([self.endpoint, self.deployment]) or (not self.mock and not (self.api_key or self.ad_token)):
             raise ValueError(
-                "AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_TEXT_MODEL must be set for --auto (or use --mock-llm)."
+                "Missing text configuration. Provide endpoint, deployment, and api_key explicitly."
             )
 
         self.session = requests.Session()
@@ -104,10 +91,10 @@ class PromptLLMClient:
         return f"{base}/openai/deployments/{self.deployment}/chat/completions?api-version={self.api_version}"
 
     def _headers(self) -> Dict[str, str]:
-        return {
-            "Content-Type": "application/json",
-            "api-key": self.api_key or "",
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["api-key"] = self.api_key
+        return headers
 
     def generate_plan(
         self,
