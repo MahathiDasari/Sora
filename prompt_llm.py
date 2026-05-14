@@ -43,13 +43,15 @@ class PromptLLMClient:
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
+        ad_token: Optional[str] = None,
         deployment: Optional[str] = None,
         api_version: Optional[str] = None,
         mock: bool = False,
     ) -> None:
         self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
+        import os
         self.api_key = api_key
-        self.ad_token = None
+        self.ad_token = ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN")
         self.deployment = deployment or "sora-2"
         self.api_version = api_version or "2024-10-01-preview"
         self.mock = mock
@@ -60,7 +62,7 @@ class PromptLLMClient:
 
         if not self.mock and not all([self.endpoint, self.deployment]) or (not self.mock and not (self.api_key or self.ad_token)):
             raise ValueError(
-                "Missing text configuration. Provide endpoint, deployment, and api_key explicitly."
+                "Missing text configuration. Provide endpoint/deployment and either api_key or ad_token."
             )
 
         self.session = requests.Session()
@@ -94,6 +96,8 @@ class PromptLLMClient:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["api-key"] = self.api_key
+        elif self.ad_token:
+            headers["Authorization"] = f"Bearer {self.ad_token}"
         return headers
 
     def generate_plan(
