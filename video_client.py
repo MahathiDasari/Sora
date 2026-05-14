@@ -23,23 +23,18 @@ class VideoClient:
         mock: bool = False,
         mock_source: Optional[Path] = None,
     ) -> None:
-        import os
-
-        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
-        # Prefer OpenAI's standard env var, but keep backward-compatible Azure var.
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
-        self.model = model or os.getenv("AZURE_OPENAI_VIDEO_MODEL")
+        self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
+        self.api_key = api_key
+        self.ad_token = None
+        self.model = model or "sora-2"
         self.mock = mock
         self.mock_source = mock_source or Path("samples/mock_clip.mp4")
 
-        self.base_url = os.getenv("OPENAI_BASE_URL")
-        if not self.base_url and self.endpoint:
-            self.base_url = normalize_azure_openai_endpoint(self.endpoint).rstrip("/") + "/openai/v1/"
+        self.base_url = normalize_azure_openai_endpoint(self.endpoint).rstrip("/") + "/openai/v1/"
 
-        if not self.mock and not all([self.base_url, self.api_key, self.model]):
+        if not self.mock and (not all([self.base_url, self.model]) or not self.api_key):
             raise ValueError(
-                "Missing video configuration. Set OPENAI_BASE_URL + OPENAI_API_KEY (recommended) "
-                "or AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY, plus AZURE_OPENAI_VIDEO_MODEL (e.g., 'sora-2')."
+                "Missing video configuration. Provide endpoint and api_key explicitly."
             )
 
         self._client = None
