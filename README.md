@@ -47,6 +47,7 @@ Required variables:
 ```
 AZURE_OPENAI_API_KEY=your-key-here  # option 1
 AZURE_OPENAI_AD_TOKEN=your-entra-bearer-token  # option 2 (no API key)
+# option 3 (no key/token env): run `az login` and the app will request a token automatically
 # endpoint and model are preconfigured in code:
 # https://oai-inforit-learningpath-dev-eus2.openai.azure.com/openai/v1
 # deployment/model: sora-2

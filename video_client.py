@@ -4,6 +4,7 @@ import time
 import shutil
 import subprocess
 from pathlib import Path
+import subprocess
 from typing import Optional, Tuple
 
 from utils import normalize_azure_openai_endpoint
@@ -12,6 +13,31 @@ from ffmpeg_bin import ffmpeg_exe
 DEFAULT_TIMEOUT = 10
 POLL_INTERVAL = 10
 SUPPORTED_SORA2_SECONDS = (4, 8, 12)
+
+
+def _resolve_ad_token(token: Optional[str]) -> Optional[str]:
+    if token:
+        return token
+    try:
+        out = subprocess.check_output(
+            [
+                "az",
+                "account",
+                "get-access-token",
+                "--resource",
+                "https://cognitiveservices.azure.com",
+                "--query",
+                "accessToken",
+                "-o",
+                "tsv",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=8,
+        ).strip()
+        return out or None
+    except Exception:
+        return None
 
 
 class VideoClient:
@@ -27,7 +53,7 @@ class VideoClient:
         self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
         import os
         self.api_key = api_key
-        self.ad_token = ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN")
+        self.ad_token = _resolve_ad_token(ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN"))
         self.model = model or "sora-2"
         self.mock = mock
         self.mock_source = mock_source or Path("samples/mock_clip.mp4")
@@ -36,7 +62,7 @@ class VideoClient:
 
         if not self.mock and (not all([self.base_url, self.model]) or not (self.api_key or self.ad_token)):
             raise ValueError(
-                "Missing video configuration. Provide endpoint/model and either api_key or ad_token."
+                "Missing video configuration. Provide endpoint/model and either api_key, ad_token, or run az login."
             )
 
         self._client = None

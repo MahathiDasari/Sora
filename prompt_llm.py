@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import subprocess
 
 import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -33,6 +34,31 @@ class PromptPlan:
         }
 
 
+def _resolve_ad_token(token: Optional[str]) -> Optional[str]:
+    if token:
+        return token
+    try:
+        out = subprocess.check_output(
+            [
+                "az",
+                "account",
+                "get-access-token",
+                "--resource",
+                "https://cognitiveservices.azure.com",
+                "--query",
+                "accessToken",
+                "-o",
+                "tsv",
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=8,
+        ).strip()
+        return out or None
+    except Exception:
+        return None
+
+
 class PromptLLMClient:
     """Generates a structured storyboard/prompt plan from a topic + time.
 
@@ -51,7 +77,7 @@ class PromptLLMClient:
         self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
         import os
         self.api_key = api_key
-        self.ad_token = ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN")
+        self.ad_token = _resolve_ad_token(ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN"))
         self.deployment = deployment or "sora-2"
         self.api_version = api_version or "2024-10-01-preview"
         self.mock = mock
@@ -62,7 +88,7 @@ class PromptLLMClient:
 
         if not self.mock and not all([self.endpoint, self.deployment]) or (not self.mock and not (self.api_key or self.ad_token)):
             raise ValueError(
-                "Missing text configuration. Provide endpoint/deployment and either api_key or ad_token."
+                "Missing text configuration. Provide endpoint/deployment and either api_key, ad_token, or run az login."
             )
 
         self.session = requests.Session()
