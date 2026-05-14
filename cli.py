@@ -91,6 +91,17 @@ def _pick_negatives(default: Optional[List[str]] = None) -> List[str]:
     return picks or (default or [])
 
 
+
+
+def _make_planner(mock_llm: bool = False) -> PromptLLMClient:
+    if mock_llm:
+        return PromptLLMClient(mock=True)
+    try:
+        return PromptLLMClient(mock=False)
+    except ValueError as exc:
+        typer.echo(f"[warning] {exc}\nFalling back to --mock-llm mode for prompt generation.")
+        return PromptLLMClient(mock=True)
+
 def _resolve_run_dir(run: Optional[Path]) -> Path:
     root = runs_root()
     if run:
@@ -172,7 +183,7 @@ def new(
     segments = None
     training_script = None
     if auto:
-        planner = PromptLLMClient(mock=mock_llm)
+        planner = _make_planner(mock_llm)
         vision_dict = vision_obj.to_dict() if vision_obj else None
         if template_norm == "training-script":
             try:
@@ -223,7 +234,7 @@ def new(
             environment = environment or "Clean minimal studio with soft neutral background, subtle floating UI silhouettes and labeled icon tiles, light motion graphics, brand-safe"
             negatives = ["No sudden zooms", "No random cuts", "No camera shake", "Do not change character outfits", "Do not add new characters", "Do not change environment"]
 
-            planner = PromptLLMClient(mock=mock_llm)
+            planner = _make_planner(mock_llm)
             try:
                 training_script = planner.generate_training_script(
                     course_block=goal,
@@ -557,7 +568,7 @@ def refine(
             return
         
         # Use LLM to regenerate this specific segment with feedback
-        planner = PromptLLMClient()
+        planner = _make_planner(False)
         typer.echo("\nRegenerating segment with LLM...")
         
         # For now, regenerate entire plan (future: segment-specific refinement)
@@ -592,7 +603,7 @@ def refine(
     # General refinement: regenerate everything with updated vision
     typer.echo("Regenerating all prompts with current vision...")
     
-    planner = PromptLLMClient()
+    planner = _make_planner(False)
     vision_dict = vision_obj.to_dict() if vision_obj else None
     plan = planner.generate_plan(
         topic=storyboard.goal,
@@ -641,7 +652,7 @@ def feedback(
     vision_dict = vision_obj.to_dict() if vision_obj else None
     
     # Use LLM to incorporate feedback and regenerate prompts
-    planner = PromptLLMClient()
+    planner = _make_planner(False)
     typer.echo("Regenerating prompts with your feedback...\n")
     
     # Append feedback to the topic to guide LLM
