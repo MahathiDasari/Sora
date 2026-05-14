@@ -258,7 +258,7 @@ class VideoClient:
     def _mock_clip(self, output_path: Path) -> Path:
         if not self.mock_source.exists():
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            # Create a small, valid MP4 so ffmpeg frame extraction works.
+            # Create a small, valid MP4 preview clip so mock mode is visibly non-black.
             try:
                 cmd = [
                     ffmpeg_exe(),
@@ -266,7 +266,7 @@ class VideoClient:
                     "-f",
                     "lavfi",
                     "-i",
-                    "color=c=black:s=1280x720:r=30",
+                    "testsrc2=s=1280x720:r=30",
                     "-t",
                     "1",
                     "-pix_fmt",
