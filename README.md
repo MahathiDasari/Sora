@@ -45,10 +45,11 @@ Create environment variables with your Azure credentials:
 
 Required variables:
 ```
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-key-here
-AZURE_OPENAI_VIDEO_MODEL=your-sora-deployment-name
-AZURE_OPENAI_TEXT_MODEL=your-gpt-deployment-name
+AZURE_OPENAI_API_KEY=your-key-here  # option 1
+AZURE_OPENAI_AD_TOKEN=your-entra-bearer-token  # option 2 (no API key)
+# endpoint and model are preconfigured in code:
+# https://oai-inforit-learningpath-dev-eus2.openai.azure.com/openai/v1
+# deployment/model: sora-2
 ```
 
 ## How to Create a Video (Simple Guide)
