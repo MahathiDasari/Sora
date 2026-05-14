@@ -19,27 +19,24 @@ class VideoClient:
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
+        ad_token: Optional[str] = None,
         model: Optional[str] = None,
         mock: bool = False,
         mock_source: Optional[Path] = None,
     ) -> None:
+        self.endpoint = endpoint or "https://oai-inforit-learningpath-dev-eus2.openai.azure.com"
         import os
-
-        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
-        # Prefer OpenAI's standard env var, but keep backward-compatible Azure var.
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
-        self.model = model or os.getenv("AZURE_OPENAI_VIDEO_MODEL")
+        self.api_key = api_key
+        self.ad_token = ad_token or os.getenv("AZURE_OPENAI_AD_TOKEN")
+        self.model = model or "sora-2"
         self.mock = mock
         self.mock_source = mock_source or Path("samples/mock_clip.mp4")
 
-        self.base_url = os.getenv("OPENAI_BASE_URL")
-        if not self.base_url and self.endpoint:
-            self.base_url = normalize_azure_openai_endpoint(self.endpoint).rstrip("/") + "/openai/v1/"
+        self.base_url = normalize_azure_openai_endpoint(self.endpoint).rstrip("/") + "/openai/v1/"
 
-        if not self.mock and not all([self.base_url, self.api_key, self.model]):
+        if not self.mock and (not all([self.base_url, self.model]) or not (self.api_key or self.ad_token)):
             raise ValueError(
-                "Missing video configuration. Set OPENAI_BASE_URL + OPENAI_API_KEY (recommended) "
-                "or AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY, plus AZURE_OPENAI_VIDEO_MODEL (e.g., 'sora-2')."
+                "Missing video configuration. Provide endpoint/model and either api_key or ad_token."
             )
 
         self._client = None
@@ -52,7 +49,8 @@ class VideoClient:
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError("Missing dependency 'openai'. Run: pip install -r requirements.txt") from exc
 
-        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        default_headers = {"Authorization": f"Bearer {self.ad_token}"} if self.ad_token and not self.api_key else None
+        self._client = OpenAI(api_key=self.api_key or "unused", base_url=self.base_url, default_headers=default_headers)
         # Sanity check: older clients may not have the videos API.
         if not hasattr(self._client, "videos"):
             raise RuntimeError("Your 'openai' package is too old; upgrade it (pip install --upgrade openai).")
