@@ -43,6 +43,23 @@ from utils import (
 )
 from video_client import VideoClient
 
+
+DEFAULT_IDM_INTEGRATION_STORY = (
+    "Hi there! Today I want to take you through our integration with the Infor Document Management "
+    "System, which allows users to upload their documents to IDM and view them within MES. So the "
+    "first thing that I'm going to need to do is go to IDM and find my documents. And to do that "
+    "I'll go into the menu, look for Document Management, and when that loads I'll go to my documents, "
+    "and you can see here here's what I've made earlier. So if I go into that document, you can see "
+    "we have all of our standard information here, but if you go to the attributes tab, you can see "
+    "we also have an attribute value here. Well, this attribute can be mapped to properties in MES. "
+    "For example, the attribute ID1 is being used in IDM to hold the item number, and in MES we've "
+    "mapped this to the material number. So if we head over to the MES now, and we go to the Document "
+    "Base Report, which I have here, you can see that we've filtered on our Entity Manager of Material, "
+    "and then when we click on Apply, you see the same image here as well. And it's that easy. So now "
+    "all of our operators can have access to this new information without having to do anything to get "
+    "it, and it's controlled completely within the IDM application."
+)
+
 app = typer.Typer(
     help="Single-machine demo CLI for sequential Sora-style video generation.",
     pretty_exceptions_show_locals=False,
@@ -133,7 +150,7 @@ def new(
 ) -> None:
     """Create a new run with storyboard and prompts."""
 
-    goal = goal or _prompt_list("Topic / goal")
+    goal = goal or DEFAULT_IDM_INTEGRATION_STORY
     aspect = aspect or _prompt_list("Aspect ratio", "16:9")
 
     template_norm = (template or "default").strip().lower()
